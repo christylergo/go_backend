@@ -4,15 +4,21 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 )
 
 type UserInfo struct {
-	UserName string `form:"user_name" binding:"required,name_validator"`
-	Passwd   string `form:"pass_word" binding:"required"`
-	Phone    string `form:"phone" binding:"required,phone_validator"`
-	Email    string `form:"email"`
+	Id   int    `form:"id"`
+	Name string `form:"name" binding:"required,name_validator"`
+	Age  int    `form:"age" binding:"required,lt=200"`
+}
+
+func (u *UserInfo) TableName() string {
+	return "userinfo"
 }
 
 func FirstPage(c *gin.Context) {
@@ -22,13 +28,27 @@ func FirstPage(c *gin.Context) {
 
 func registerFunc(c *gin.Context) {
 	user := UserInfo{}
+	var customValidator validator.Func = func(f validator.FieldLevel) bool {
+		val := f.Field().String()
+		if strings.Contains(val, " ") {
+			return false
+		}
+		return true
+	}
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterValidation("name_validator", customValidator)
+	}
 	// This c.ShouldBind consumes c.Request.Body and it cannot be reused.
 	if errA := c.ShouldBind(&user); errA != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "User validation failed!",
 			"error":   errA.Error()})
 	}
+	fmt.Println(user)
 	wirteUserInfoToPg(&user)
+	//		curl -X POST localhost:8080/register
+	//	   -H "Content-Type: application/x-www-form-urlencoded"
+	//	   -d "param1=value1&param2=value2"
 }
 
 func loginFunc(c *gin.Context) {
