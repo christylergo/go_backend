@@ -1,0 +1,20 @@
+syntax = "proto3";
+package authen;
+// import public "other.proto";
+option go_package = "./authen";
+service Authentication {
+    rpc GetAuthenLoginFeedBack(User)returns(UserAuthenResponse){};
+    rpc GetAuthenRegisterFeedBack(User)returns(UserAuthenResponse){};
+}
+
+message User{
+    string Name=1;
+    uint64 Phone=2;
+    string Email=3;
+    string PassWord=4;
+}
+
+message UserAuthenResponse{
+    uint64 ID=1;
+    string Token=3;
+}

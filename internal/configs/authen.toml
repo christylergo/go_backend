@@ -1,0 +1,7 @@
+[authentication]
+serverAddr = "localhost:50051"
+tls = false
+caFile = './ca/ca.pem'
+certFile = './ca/serverCA/go-gin.pem'
+keyFile = './ca/serverCA/go-gin-key.pem'
+serverHostOverride = "x.test.example.com"
