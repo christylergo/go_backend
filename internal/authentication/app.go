@@ -1,7 +1,6 @@
 package authentication
 
 import (
-	"fmt"
 	"math"
 	"net/http"
 	"regexp"
@@ -60,7 +59,7 @@ func registerFunc(c *gin.Context) {
 	// gRPC cal
 
 	id, token := app.AuthenRegisterRPC(translateUser(&user))
-	fmt.Println(id, token)
+	c.JSON(http.StatusOK, gin.H{"id": id, "token": token})
 }
 
 func loginFunc(c *gin.Context) {
@@ -69,8 +68,8 @@ func loginFunc(c *gin.Context) {
 		v.RegisterValidation("name_validator", nameValidator)
 		v.RegisterValidation("phone_validator", phoneValidator)
 	}
-	fmt.Println(user)
-	//gRPC call
+	id, token := app.AuthenLoginRPC(translateUser(&user))
+	c.JSON(http.StatusOK, gin.H{"id": id, "token": token})
 }
 
 // func serveFile(c *gin.Context) {

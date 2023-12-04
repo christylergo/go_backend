@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,7 +15,7 @@ import (
 	pb "example.com/go_backend/internal/grpc/authen"
 	"example.com/go_backend/internal/models"
 	"example.com/go_backend/internal/store"
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -33,7 +35,7 @@ func (s *myAuthenServer) GetAuthenLoginFeedBack(ctx context.Context, user *pb.Us
 	} else {
 		key = user.GetName()
 	}
-	val, err := rdb.Get(key).Result()
+	val, err := rdb.Get(context.Background(), key).Result()
 	if err != nil {
 		if err == redis.Nil {
 			fmt.Println("key does not exists")
@@ -55,12 +57,46 @@ func (s *myAuthenServer) GetAuthenLoginFeedBack(ctx context.Context, user *pb.Us
 			pgDB.Where("name = ?", user.Name).Preload("UserInfo.MemberRight").Take(&gormUser)
 		}
 		if v, err := json.Marshal(&gormUser); err == nil {
-			rdb.Set(gormUser.Name, string(v), time.Millisecond*50)
-			rdb.Set(strconv.Itoa(int(gormUser.Phone)), string(v), time.Millisecond*50)
+			rdb.Set(context.Background(), gormUser.Name, string(v), time.Millisecond*50)
+			rdb.Set(context.Background(), strconv.Itoa(int(gormUser.Phone)), string(v), time.Millisecond*50)
 		}
 
 	}
-	return res, nil
+	h := sha256.New()
+	_, err = h.Write([]byte(user.PassWord + gormUser.CreatedAt.String()))
+	if err != nil {
+		return res, err
+	}
+	err = nil
+	if gormUser.PassWord == hex.EncodeToString(h.Sum(nil)) {
+		res.ID = uint64(gormUser.ID)
+		res.Token, err = generateTokenUsingHs256(&gormUser)
+	}
+	return res, err
+}
+
+func (s *myAuthenServer) GetAuthenRegisterFeedBack(ctx context.Context, user *pb.User) (*pb.UserAuthenResponse, error) {
+	gormUser := models.User{}
+	gormUser.Name = user.GetName()
+	gormUser.Phone = uint(user.GetPhone())
+	gormUser.Email = user.Email
+	gormUser.PassWord = user.PassWord
+	pgDB := store.GetPgConn()
+	result := pgDB.Create(&gormUser)
+	if result.Error != nil {
+		log.Print(result.Error.Error())
+	}
+	pgDB.Where("phone = ?", user.Phone).Preload("UserInfo.MemberRight").Take(&gormUser)
+	rdb := store.GetRedisClient()
+	if v, err := json.Marshal(&gormUser); err == nil {
+		rdb.Set(context.Background(), gormUser.Name, string(v), time.Millisecond*50)
+		rdb.Set(context.Background(), strconv.Itoa(int(gormUser.Phone)), string(v), time.Millisecond*50)
+	}
+	res := &pb.UserAuthenResponse{}
+	res.ID = uint64(gormUser.ID)
+	var terr error
+	res.Token, terr = generateTokenUsingHs256(&gormUser)
+	return res, terr
 }
 
 func AuthenServerRPC() {

@@ -1,6 +1,6 @@
 package store
 
-import "github.com/go-redis/redis"
+import "github.com/redis/go-redis/v9"
 
 func GetRedisClient() *redis.Client {
 	rdb := redis.NewClient(&redis.Options{
